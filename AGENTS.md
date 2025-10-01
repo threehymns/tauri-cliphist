@@ -30,7 +30,6 @@ This is a Tauri application that provides a GUI frontend for the cliphist clipbo
 - ES6 imports with named imports preferred
 - Async functions for Tauri invoke calls
 - Use TanStack Virtual for large lists: `createVirtualizer()` with reactive count
-- Format timestamps for readability: `toLocaleString()` with user-friendly options
 
 ### Rust
 - Execute external commands using `std::process::Command`
@@ -39,7 +38,6 @@ This is a Tauri application that provides a GUI frontend for the cliphist clipbo
 - Implement efficient fuzzy search combining substring and word-based matching
 - snake_case for functions/variables, PascalCase for structs/enums
 - Group imports: external crates → std → local modules
-- Use `chrono` for timestamp parsing and handling
 
 ### General
 - No specific linter/formatter configured - follow language conventions

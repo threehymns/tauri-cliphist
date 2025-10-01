@@ -1,12 +1,10 @@
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
 use std::process::Command;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ClipboardEntry {
     pub id: String,
     pub content: String,
-    pub timestamp: DateTime<Utc>,
     pub content_type: String,
 }
 
@@ -86,24 +84,20 @@ fn parse_cliphist_list(output: &str) -> Result<Vec<ClipboardEntry>, CliphistErro
             // Join all remaining parts as content (in case content contains tabs)
             let content = parts[1..].join("\t");
 
-            // Create a truncated preview for display (first 100 chars)
-            let preview = if content.chars().count() > 100 {
-                let truncated: String = content.chars().take(97).collect();
-                format!("{}...", truncated)
-            } else {
-                content.clone()
-            };
-
             entries.push(ClipboardEntry {
                 id,
-                content: preview, // Display preview in list
-                timestamp: Utc::now(), // cliphist doesn't provide timestamps in list
+                content: content.clone(), // Full content for display
                 content_type: "text".to_string(), // Assume text for now
             });
         }
     }
 
     Ok(entries)
+}
+
+#[tauri::command]
+fn is_cliphist_available() -> bool {
+    run_cliphist_command(&["list"]).is_ok()
 }
 
 #[tauri::command]
@@ -121,8 +115,36 @@ fn get_entry_content(id: String) -> Result<String, CliphistError> {
 
 #[tauri::command]
 fn delete_entry(id: String) -> Result<(), CliphistError> {
-    run_cliphist_command(&["delete", &id])?;
-    Ok(())
+    use std::io::Write;
+    use std::process::Stdio;
+
+    let mut child = Command::new("cliphist")
+        .arg("delete")
+        .stdin(Stdio::piped())
+        .spawn()
+        .map_err(|e| CliphistError {
+            message: format!("Failed to execute cliphist delete: {}", e),
+        })?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        if let Err(e) = stdin.write_all(id.as_bytes()) {
+            return Err(CliphistError {
+                message: format!("Failed to write to cliphist stdin: {}", e),
+            });
+        }
+    }
+
+    let output = child.wait_with_output().map_err(|e| CliphistError {
+        message: format!("Failed to wait for cliphist: {}", e),
+    })?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(CliphistError {
+            message: format!("cliphist delete failed: {}", String::from_utf8_lossy(&output.stderr)),
+        })
+    }
 }
 
 #[tauri::command]
@@ -136,33 +158,38 @@ fn search_history(query: String) -> Result<Vec<ClipboardEntry>, CliphistError> {
 
 #[tauri::command]
 fn copy_to_clipboard(content: String) -> Result<(), CliphistError> {
-    // Use wl-copy if available (Wayland), otherwise try xclip (X11), or fallback to error
-    let result = Command::new("wl-copy")
-        .arg(&content)
-        .output();
+    use std::io::Write;
 
-    if result.is_err() {
-        // Try xclip for X11 systems
-        let result = Command::new("xclip")
-            .args(&["-selection", "clipboard"])
-            .stdin(std::process::Stdio::piped())
-            .spawn();
-
-        if let Ok(mut child) = result {
-            use std::io::Write;
-            if let Some(mut stdin) = child.stdin.take() {
-                let _ = stdin.write_all(content.as_bytes());
-            }
-            let _ = child.wait();
-            Ok(())
-        } else {
-            Err(CliphistError {
-                message: "No clipboard tool available. Install wl-clipboard (Wayland) or xclip (X11).".to_string(),
-            })
+    // Try wl-copy first (Wayland)
+    if let Ok(mut child) = Command::new("wl-copy")
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+    {
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = stdin.write_all(content.as_bytes());
         }
-    } else {
-        Ok(())
+        if child.wait().map(|s| s.success()).unwrap_or(false) {
+            return Ok(());
+        }
     }
+
+    // Try xclip (X11)
+    if let Ok(mut child) = Command::new("xclip")
+        .args(&["-selection", "clipboard"])
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+    {
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = stdin.write_all(content.as_bytes());
+        }
+        if child.wait().map(|s| s.success()).unwrap_or(false) {
+            return Ok(());
+        }
+    }
+
+    Err(CliphistError {
+        message: "No clipboard tool available. Install wl-clipboard (Wayland) or xclip (X11).".to_string(),
+    })
 }
 
 
@@ -172,6 +199,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            is_cliphist_available,
             get_history,
             get_entry_content,
             delete_entry,
