@@ -1,7 +1,8 @@
 {
 	"name": "tauri-cliphist",
 	"version": "0.1.0",
-	"description": "",
+	"description": "A Tauri application that provides a modern GUI interface for the cliphist clipboard manager.",
+	"author": "threehymns",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
@@ -12,6 +13,12 @@
 		"tauri": "tauri"
 	},
 	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/threeehymns/tauri-cliphist"
+	},
+	"homepage": "https://github.com/threeehymns/tauri-cliphist",
+	"keywords": ["clipboard", "tauri", "cliphist"],
 	"dependencies": {
 		"@tanstack/svelte-virtual": "^3.13.12",
 		"@tauri-apps/api": "^2",

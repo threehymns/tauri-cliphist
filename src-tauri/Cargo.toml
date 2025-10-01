@@ -1,8 +1,11 @@
 [package]
 name = "tauri-cliphist"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "A Tauri application that provides a modern GUI interface for the cliphist clipboard manager."
+authors = ["threehymns"]
+license = "MIT"
+homepage = "https://github.com/threeehymns/tauri-cliphist"
+repository = "https://github.com/threeehymns/tauri-cliphist"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
